@@ -4,7 +4,33 @@
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    use std::time::Duration;
+
+    use hedgehog::{
+        channels::AsyncRequestBridge,
+        service::{new_async_service_channels, start_async_service, AsyncServiceMessage},
+    };
+    use log::{debug, trace, warn};
+    use tokio::runtime::Runtime;
+
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+
+    let rt = Runtime::new().expect("Unable to create tokio runtime");
+    let _enter = rt.enter();
+
+    let (ui_async_tx, ui_async_rx) = new_async_service_channels();
+    let (svc_async_tx, svc_async_rx) = new_async_service_channels();
+
+    std::thread::spawn(move || {
+        rt.block_on(async {
+            debug!("start async service");
+            start_async_service(ui_async_tx, svc_async_rx).await;
+            warn!("done async service.");
+        })
+    });
+
+    // ui_async_rx (notifications from svc to ui) is currently not hooked up.
+    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx);
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -20,7 +46,7 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "eframe template",
         native_options,
-        Box::new(|cc| Box::new(hedgehog::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(hedgehog::TemplateApp::new(cc, ui_bridge))),
     )
 }
 

@@ -22,10 +22,13 @@ serde = { version = "1", features = ["derive"] }
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.10"
+mastodon-async = { version = "1.3.1", features = ["toml", "mt"] }
+tokio = "1.36.0"
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
+mastodon-async = { version = "1.3.1", features = ["toml"] }
 
 
 [profile.release]
