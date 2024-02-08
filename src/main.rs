@@ -7,7 +7,7 @@ fn main() -> eframe::Result<()> {
     use instant::Duration;
 
     use hedgehog::{
-        channels::{AsyncRequestBridge, Spawner},
+        channels::{new_channel_pair, AsyncRequestBridge, Spawner},
         service::{new_async_service_channels, start_async_service, AsyncServiceMessage},
     };
     use log::{debug, trace, warn};
@@ -15,8 +15,8 @@ fn main() -> eframe::Result<()> {
 
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
-    let (ui_async_tx, ui_async_rx) = new_async_service_channels();
-    let (svc_async_tx, svc_async_rx) = new_async_service_channels();
+    let (ui_async_tx, ui_async_rx) = new_channel_pair::<AsyncServiceMessage>();
+    let (svc_async_tx, svc_async_rx) = new_channel_pair::<AsyncServiceMessage>();
 
     let spawner = Spawner::new();
     let spawner_clone = spawner.clone();
@@ -51,7 +51,7 @@ fn main() -> eframe::Result<()> {
 #[cfg(target_arch = "wasm32")]
 fn main() {
     use hedgehog::{
-        channels::{AsyncRequestBridge, Spawner},
+        channels::{new_channel_pair, AsyncRequestBridge, Spawner},
         service::{new_async_service_channels, start_async_service, AsyncServiceMessage},
     };
     use log::{debug, trace, warn};
@@ -61,8 +61,8 @@ fn main() {
 
     let web_options = eframe::WebOptions::default();
 
-    let (ui_async_tx, ui_async_rx) = new_async_service_channels();
-    let (svc_async_tx, svc_async_rx) = new_async_service_channels();
+    let (ui_async_tx, ui_async_rx) = new_channel_pair::<AsyncServiceMessage>();
+    let (svc_async_tx, svc_async_rx) = new_channel_pair::<AsyncServiceMessage>();
 
     let spawner = Spawner::new();
     let spawner_clone = spawner.clone();
