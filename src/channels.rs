@@ -22,6 +22,7 @@ pub enum Message<TMsg> {
 
 pub struct AsyncRequestBridge<TMsg, TState> {
     tx: sync::mpsc::Sender<Message<TMsg>>,
+    spawner: Spawner,
     pub state: AsyncRequestBridgeState<TMsg, TState>,
 }
 
@@ -38,9 +39,13 @@ pub enum AsyncRequestBridgeState<TMsg, TState> {
 }
 
 impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
-    pub fn new(tx: sync::mpsc::Sender<Message<TMsg>>) -> AsyncRequestBridge<TMsg, TState> {
+    pub fn new(
+        tx: sync::mpsc::Sender<Message<TMsg>>,
+        spawner: Spawner,
+    ) -> AsyncRequestBridge<TMsg, TState> {
         AsyncRequestBridge {
             tx,
+            spawner,
             state: AsyncRequestBridgeState::Init,
         }
     }
@@ -129,17 +134,40 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub struct Spawner {
-    rt: tokio::runtime::Runtime,
+    rt: std::sync::Arc<std::sync::Mutex<tokio::runtime::Runtime>>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl Spawner {
-    pub fn spawn_async<F>(&mut self, f: F)
+    pub fn new<F>(f: F) -> Self
     where
         F: std::future::Future + std::marker::Send + 'static,
         <F as std::future::Future>::Output: Send,
     {
-        self.rt.spawn(f);
+        let rt = tokio::runtime::Runtime::new().expect("Unable to create tokio runtime");
+        let _enter = rt.enter();
+
+        let spawner = Spawner {
+            rt: std::sync::Arc::new(std::sync::Mutex::new(rt)),
+        };
+
+        let rt_arc = spawner.rt.clone();
+        std::thread::spawn(move || {
+            rt_arc.lock().unwrap().block_on(async {
+                debug!("start async service");
+                f.await;
+                debug!("finished async service.");
+            })
+        });
+        spawner
+    }
+
+    pub fn spawn_async<F>(&self, f: F)
+    where
+        F: std::future::Future + std::marker::Send + 'static,
+        <F as std::future::Future>::Output: Send,
+    {
+        self.rt.lock().unwrap().spawn(f);
     }
 }
 
@@ -148,7 +176,17 @@ pub struct Spawner {}
 
 #[cfg(target_arch = "wasm32")]
 impl Spawner {
-    pub fn spawn_async<F>(&mut self, f: F)
+    pub fn new<F>(f: F) -> Self
+    where
+        F: std::future::Future + std::marker::Send + 'static,
+        <F as std::future::Future>::Output: Send,
+    {
+        let spawner = Spawner {};
+        spawner.spawn_async(f);
+        spawner
+    }
+
+    pub fn spawn_async<F>(&self, f: F)
     where
         F: std::future::Future + std::marker::Send + 'static,
         <F as std::future::Future>::Output: Send,
