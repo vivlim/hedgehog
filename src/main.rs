@@ -4,7 +4,7 @@
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use std::time::Duration;
+    use instant::Duration;
 
     use hedgehog::{
         channels::AsyncRequestBridge,
@@ -53,17 +53,32 @@ fn main() -> eframe::Result<()> {
 // When compiling to web using trunk:
 #[cfg(target_arch = "wasm32")]
 fn main() {
+    use hedgehog::{
+        channels::AsyncRequestBridge,
+        service::{new_async_service_channels, start_async_service, AsyncServiceMessage},
+    };
+
     // Redirect `log` message to `console.log` and friends:
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
     let web_options = eframe::WebOptions::default();
+
+    let (ui_async_tx, ui_async_rx) = new_async_service_channels();
+    let (svc_async_tx, svc_async_rx) = new_async_service_channels();
+
+    wasm_bindgen_futures::spawn_local(async {
+        start_async_service(ui_async_tx, svc_async_rx).await;
+    });
+
+    // ui_async_rx (notifications from svc to ui) is currently not hooked up.
+    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx);
 
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()
             .start(
                 "the_canvas_id", // hardcode it
                 web_options,
-                Box::new(|cc| Box::new(hedgehog::TemplateApp::new(cc))),
+                Box::new(|cc| Box::new(hedgehog::TemplateApp::new(cc, ui_bridge))),
             )
             .await
             .expect("failed to start eframe");

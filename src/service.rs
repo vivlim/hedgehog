@@ -1,9 +1,14 @@
-use std::time::Duration;
+use instant::Duration;
 
 use log::{debug, warn};
 use tokio::sync::mpsc;
 
 use crate::channels::Message;
+
+#[cfg(not(target_arch = "wasm"))]
+use tokio::time::*;
+#[cfg(target_arch = "wasm")]
+use wasmtimer::tokio::*;
 
 pub fn new_async_service_channels() -> (
     mpsc::Sender<Message<AsyncServiceMessage>>,
@@ -22,7 +27,8 @@ pub async fn start_async_service(
                 Message::Request { msg, reply } => match msg {
                     AsyncServiceMessage::Echo(n) => {
                         debug!("receive message. waiting 2 secs");
-                        tokio::time::sleep(Duration::from_secs(2)).await;
+                        //sleep(Duration::from_secs(2)).await; // This panics on wasm, not
+                        //essential so comment it out
                         match reply.send(AsyncServiceMessage::Echo(n + 1)) {
                             Ok(_) => debug!("replied"),
                             Err(e) => warn!("Failed to send echo reply for {}, {:?}", n, e),
