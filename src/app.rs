@@ -123,6 +123,7 @@ impl eframe::App for TemplateApp {
                             Box::new(|m, prev_state| match (m, prev_state) {
                                 (AsyncServiceMessage::Echo(n), Some(p)) => n + p,
                                 (AsyncServiceMessage::Echo(n), None) => n,
+                                _ => panic!("can't handle this response."),
                             }),
                         );
                     }

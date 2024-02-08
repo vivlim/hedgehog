@@ -2,9 +2,13 @@ use std::mem;
 
 use log::{debug, warn};
 use tokio::sync::{
-    self,
+    self, mpsc,
     oneshot::{self, error::TryRecvError},
 };
+
+pub fn new_channel_pair<T>() -> (mpsc::Sender<Message<T>>, mpsc::Receiver<Message<T>>) {
+    mpsc::channel(255)
+}
 
 pub enum Message<TMsg> {
     Request {
@@ -120,5 +124,37 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
         } else {
             debug!("Unexpected: previous state was not awaiting?");
         }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub struct Spawner {
+    rt: tokio::runtime::Runtime,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Spawner {
+    pub fn spawn_async<F>(&mut self, f: F)
+    where
+        F: std::future::Future + std::marker::Send + 'static,
+        <F as std::future::Future>::Output: Send,
+    {
+        self.rt.spawn(f);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub struct Spawner {}
+
+#[cfg(target_arch = "wasm32")]
+impl Spawner {
+    pub fn spawn_async<F>(&mut self, f: F)
+    where
+        F: std::future::Future + std::marker::Send + 'static,
+        <F as std::future::Future>::Output: Send,
+    {
+        wasm_bindgen_futures::spawn_local(async {
+            f.await;
+        });
     }
 }

@@ -4,40 +4,32 @@ use log::{debug, warn};
 use mastodon_async::{Mastodon, Registration};
 use tokio::sync::mpsc;
 
-use crate::channels::{new_channel_pair, Message};
+use crate::channels::Message;
 
 #[cfg(not(target_arch = "wasm"))]
 use tokio::time::*;
 #[cfg(target_arch = "wasm")]
 use wasmtimer::tokio::*;
 
-pub fn new_async_service_channels() -> (
-    mpsc::Sender<Message<AsyncServiceMessage>>,
-    mpsc::Receiver<Message<AsyncServiceMessage>>,
-) {
-    mpsc::channel(255)
-}
-pub async fn start_async_service(
-    mut tx: mpsc::Sender<Message<AsyncServiceMessage>>,
-    mut rx: mpsc::Receiver<Message<AsyncServiceMessage>>,
-) {
-    let mut state: AsyncServiceState = Default::default();
+pub async fn start_auth_service(mut rx: mpsc::Receiver<Message<AuthMessage>>) {
+    let mut state: AuthState = Default::default();
 
     loop {
         // wait for messages
         match rx.recv().await {
             Some(rx) => match rx {
                 Message::Request { msg, reply } => match msg {
-                    AsyncServiceMessage::Echo(n) => {
+                    AuthMessage::Echo(n) => {
                         debug!("receive message. waiting 2 secs");
                         //sleep(Duration::from_secs(2)).await; // This panics on wasm, not
                         //essential so comment it out
-                        match reply.send(AsyncServiceMessage::Echo(n + 1)) {
+                        match reply.send(AuthMessage::Echo(n + 1)) {
                             Ok(_) => debug!("replied"),
                             Err(e) => warn!("Failed to send echo reply for {}, {:?}", n, e),
                         }
                     }
-                    AsyncServiceMessage::StartAuth(url) => {}
+                    AuthMessage::MastodonRegister(url) => {}
+                    _ => {}
                 },
                 Message::Notification { msg } => warn!("Unhandled mssage type"),
             },
@@ -50,10 +42,24 @@ pub async fn start_async_service(
 }
 
 #[derive(Debug)]
-pub enum AsyncServiceMessage {
+pub enum AuthMessage {
     Echo(u32),
-    StartAuth(String),
+    MastodonRegister(String),
+    MastodonData(String),
 }
 
 #[derive(Default)]
-struct AsyncServiceState {}
+struct AuthState {
+    mastodon: Option<Mastodon>,
+}
+
+/*
+async fn register(url: String) -> Result<Mastodon> {
+    let registration = Registration::new(url)
+        .client_name("hedgehog")
+        .build()
+        .await?;
+
+    Ok(mastodon)
+}
+*/
