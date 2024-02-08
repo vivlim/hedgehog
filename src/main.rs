@@ -18,9 +18,11 @@ fn main() -> eframe::Result<()> {
     let (ui_async_tx, ui_async_rx) = new_async_service_channels();
     let (svc_async_tx, svc_async_rx) = new_async_service_channels();
 
-    let spawner = Spawner::new(async move {
+    let spawner = Spawner::new();
+    let spawner_clone = spawner.clone();
+    let spawner = spawner.spawn_root(async move {
         debug!("start async service");
-        start_async_service(ui_async_tx, svc_async_rx).await;
+        start_async_service(ui_async_tx, svc_async_rx, spawner_clone).await;
         warn!("done async service.");
     });
 
@@ -62,9 +64,11 @@ fn main() {
     let (ui_async_tx, ui_async_rx) = new_async_service_channels();
     let (svc_async_tx, svc_async_rx) = new_async_service_channels();
 
-    let spawner = Spawner::new(async move {
+    let spawner = Spawner::new();
+    let spawner_clone = spawner.clone();
+    let spawner = spawner.spawn_root(async move {
         debug!("start async service");
-        start_async_service(ui_async_tx, svc_async_rx).await;
+        start_async_service(ui_async_tx, svc_async_rx, spawner_clone).await;
         warn!("done async service.");
     });
 

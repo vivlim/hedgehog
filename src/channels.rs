@@ -133,25 +133,28 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
 pub struct Spawner {
     rt: std::sync::Arc<std::sync::Mutex<tokio::runtime::Runtime>>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl Spawner {
-    pub fn new<F>(f: F) -> Self
+    pub fn new() -> Self {
+        let rt = tokio::runtime::Runtime::new().expect("Unable to create tokio runtime");
+        let _enter = rt.enter();
+
+        Spawner {
+            rt: std::sync::Arc::new(std::sync::Mutex::new(rt)),
+        }
+    }
+
+    pub fn spawn_root<F>(self, f: F) -> Self
     where
         F: std::future::Future + std::marker::Send + 'static,
         <F as std::future::Future>::Output: Send,
     {
-        let rt = tokio::runtime::Runtime::new().expect("Unable to create tokio runtime");
-        let _enter = rt.enter();
-
-        let spawner = Spawner {
-            rt: std::sync::Arc::new(std::sync::Mutex::new(rt)),
-        };
-
-        let rt_arc = spawner.rt.clone();
+        let rt_arc = self.rt.clone();
         std::thread::spawn(move || {
             rt_arc.lock().unwrap().block_on(async {
                 debug!("start async service");
@@ -159,7 +162,7 @@ impl Spawner {
                 debug!("finished async service.");
             })
         });
-        spawner
+        self
     }
 
     pub fn spawn_async<F>(&self, f: F)
@@ -172,18 +175,22 @@ impl Spawner {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[derive(Clone)]
 pub struct Spawner {}
 
 #[cfg(target_arch = "wasm32")]
 impl Spawner {
-    pub fn new<F>(f: F) -> Self
+    pub fn new() -> Self {
+        Spawner {}
+    }
+
+    pub fn spawn_root<F>(self, f: F) -> Self
     where
         F: std::future::Future + std::marker::Send + 'static,
         <F as std::future::Future>::Output: Send,
     {
-        let spawner = Spawner {};
-        spawner.spawn_async(f);
-        spawner
+        self.spawn_async(f);
+        self
     }
 
     pub fn spawn_async<F>(&self, f: F)

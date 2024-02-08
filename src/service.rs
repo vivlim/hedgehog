@@ -4,7 +4,7 @@ use log::{debug, warn};
 use mastodon_async::{Mastodon, Registration};
 use tokio::sync::mpsc;
 
-use crate::channels::{new_channel_pair, Message};
+use crate::channels::{new_channel_pair, Message, Spawner};
 
 #[cfg(not(target_arch = "wasm"))]
 use tokio::time::*;
@@ -20,6 +20,7 @@ pub fn new_async_service_channels() -> (
 pub async fn start_async_service(
     mut tx: mpsc::Sender<Message<AsyncServiceMessage>>,
     mut rx: mpsc::Receiver<Message<AsyncServiceMessage>>,
+    spawner: Spawner,
 ) {
     let mut state: AsyncServiceState = Default::default();
 
@@ -37,7 +38,9 @@ pub async fn start_async_service(
                             Err(e) => warn!("Failed to send echo reply for {}, {:?}", n, e),
                         }
                     }
-                    AsyncServiceMessage::StartAuth(url) => {}
+                    AsyncServiceMessage::StartAuth(url) => {
+                        spawner.spawn_async(async {});
+                    }
                 },
                 Message::Notification { msg } => warn!("Unhandled mssage type"),
             },
