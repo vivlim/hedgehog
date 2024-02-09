@@ -1,5 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 
+use log::debug;
+
 use crate::{
     authenticate::AuthMessage,
     channels::{AsyncRequestBridge, AsyncRequestBridgeState},
@@ -160,9 +162,12 @@ impl eframe::App for TemplateApp {
                             crate::channels::AsyncRequestBridgeState::Init => {
                                 // In init state, show a button that will continue the login when
                                 // clicked.
-                                if ui.button("Continue logging in").clicked() {
+                                if ui
+                                    .button(format!("Continue logging in to {}", &self.instance))
+                                    .clicked()
+                                {
                                     auth_ui_bridge.send(
-                                        AuthMessage::Initialize,
+                                        AuthMessage::Initialize(self.instance.clone()),
                                         Box::new(|m, prev_state| match (m, prev_state) {
                                             (AuthMessage::MastodonData(md), Some(p)) => {
                                                 AuthUiState { signed_in: true }
@@ -197,32 +202,38 @@ impl eframe::App for TemplateApp {
                         ui.label("Instance:");
                         ui.text_edit_singleline(&mut self.instance);
                         if ui.button("Log in").clicked() {
+                            debug!("Send start auth message");
                             async_bridge.send(
-                                AsyncServiceMessage::StartAuth(self.instance.clone()),
-                                Box::new(|m, prev_state| match (m, prev_state) {
-                                    // Upon receiving a channel for our attempted login, update the
-                                    // state. If there is state already, add it to that
-                                    (AsyncServiceMessage::AuthChannel(ac), Some(mut p)) => {
-                                        p.auth_bridge = Some(AsyncRequestBridge::<
-                                            AuthMessage,
-                                            AuthUiState,
-                                        >::new(
-                                            ac
-                                        ));
+                                AsyncServiceMessage::StartAuth,
+                                Box::new(|m, prev_state| {
+                                    debug!("Received reply for start auth service");
+                                    match (m, prev_state) {
+                                        // Upon receiving a channel for our attempted login, update the
+                                        // state. If there is state already, add it to that
+                                        (AsyncServiceMessage::AuthChannel(ac), Some(mut p)) => {
+                                            p.auth_bridge = Some(AsyncRequestBridge::<
+                                                AuthMessage,
+                                                AuthUiState,
+                                            >::new(
+                                                ac
+                                            ));
 
-                                        p
+                                            p
+                                        }
+                                        // Or create async app state
+                                        (AsyncServiceMessage::AuthChannel(ac), None) => {
+                                            AsyncAppState {
+                                                auth_bridge: Some(AsyncRequestBridge::<
+                                                    AuthMessage,
+                                                    AuthUiState,
+                                                >::new(
+                                                    ac
+                                                )),
+                                                counter: 0,
+                                            }
+                                        }
+                                        _ => panic!("can't handle this response."),
                                     }
-                                    // Or create async app state
-                                    (AsyncServiceMessage::AuthChannel(ac), None) => AsyncAppState {
-                                        auth_bridge: Some(AsyncRequestBridge::<
-                                            AuthMessage,
-                                            AuthUiState,
-                                        >::new(
-                                            ac
-                                        )),
-                                        counter: 0,
-                                    },
-                                    _ => panic!("can't handle this response."),
                                 }),
                             );
                         }

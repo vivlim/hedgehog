@@ -132,7 +132,7 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone)]
 pub struct Spawner {
-    rt: std::sync::Arc<std::sync::Mutex<tokio::runtime::Runtime>>,
+    rt: std::sync::Arc<tokio::runtime::Runtime>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -142,7 +142,7 @@ impl Spawner {
         let _enter = rt.enter();
 
         Spawner {
-            rt: std::sync::Arc::new(std::sync::Mutex::new(rt)),
+            rt: std::sync::Arc::new(rt),
         }
     }
 
@@ -153,7 +153,7 @@ impl Spawner {
     {
         let rt_arc = self.rt.clone();
         std::thread::spawn(move || {
-            rt_arc.lock().unwrap().block_on(async {
+            rt_arc.block_on(async {
                 debug!("start async service");
                 f.await;
                 debug!("finished async service.");
@@ -167,7 +167,9 @@ impl Spawner {
         F: std::future::Future + std::marker::Send + 'static,
         <F as std::future::Future>::Output: Send,
     {
-        self.rt.lock().unwrap().spawn(f);
+        debug!("enter spawn_async");
+        self.rt.spawn(f);
+        debug!("exit spawn_async");
     }
 }
 

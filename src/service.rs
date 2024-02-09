@@ -58,7 +58,8 @@ pub async fn start_async_service_impl(
                             Err(e) => warn!("Failed to send echo reply for {}", n),
                         }
                     }
-                    AsyncServiceMessage::StartAuth(url) => {
+                    AsyncServiceMessage::StartAuth => {
+                        debug!("received start auth message");
                         let (auth_tx, auth_rx) = new_channel_pair::<AuthMessage>();
                         spawner.spawn_async(async {
                             start_auth_service(auth_rx).await;
@@ -83,7 +84,7 @@ pub async fn start_async_service_impl(
 
 pub enum AsyncServiceMessage {
     Echo(u32),
-    StartAuth(String),
+    StartAuth,
     AuthChannel(sync::mpsc::Sender<Message<AuthMessage>>),
 }
 

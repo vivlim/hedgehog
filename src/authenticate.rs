@@ -14,21 +14,24 @@ use wasmtimer::tokio::*;
 pub async fn start_auth_service(mut rx: mpsc::Receiver<Message<AuthMessage>>) {
     let mut state: AuthState = Default::default();
 
+    debug!("entered auth service");
+
     loop {
         // wait for messages
         match rx.recv().await {
             Some(rx) => match rx {
                 Message::Request { msg, reply } => match msg {
-                    AuthMessage::Echo(n) => {
-                        debug!("receive message. waiting 2 secs");
-                        //sleep(Duration::from_secs(2)).await; // This panics on wasm, not
-                        //essential so comment it out
-                        match reply.send(AuthMessage::Echo(n + 1)) {
-                            Ok(_) => debug!("replied"),
-                            Err(e) => warn!("Failed to send echo reply for {}, {:?}", n, e),
-                        }
+                    AuthMessage::Initialize(instance) => {
+                        debug!("Initializing masto client");
+                        let registration = Registration::new(instance)
+                            .client_name("hedgehog")
+                            .build()
+                            .await
+                            .unwrap();
+                        let url = registration.authorize_url().unwrap();
+                        debug!("authorize url: {}", &url);
+                        reply.send(AuthMessage::AuthorizeUrl(url)).unwrap();
                     }
-                    AuthMessage::Initialize => {}
                     _ => {}
                 },
                 Message::Notification { msg } => warn!("Unhandled mssage type"),
@@ -43,9 +46,9 @@ pub async fn start_auth_service(mut rx: mpsc::Receiver<Message<AuthMessage>>) {
 
 #[derive(Debug)]
 pub enum AuthMessage {
-    Echo(u32),
-    Initialize,
+    Initialize(String),
     MastodonData(String),
+    AuthorizeUrl(String),
 }
 
 #[derive(Default)]
