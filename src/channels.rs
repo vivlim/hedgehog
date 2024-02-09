@@ -82,7 +82,7 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
         }
     }
 
-    pub fn pump_messages(&mut self) {
+    pub fn pump_messages(&mut self) -> bool {
         let reciever = match &mut self.state {
             AsyncRequestBridgeState::Awaiting {
                 response,
@@ -93,7 +93,7 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
         };
 
         if reciever.is_none() {
-            return;
+            return false;
         }
 
         let mut incoming_msg: Result<TMsg, TryRecvError> = reciever.unwrap().try_recv();
@@ -102,11 +102,11 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
         match incoming_msg {
             Ok(_) => (),
             Err(oneshot::error::TryRecvError::Empty) => {
-                return;
+                return false;
             }
             Err(oneshot::error::TryRecvError::Closed) => {
                 warn!("Response channel closed unexpectedly");
-                return;
+                return false;
             }
         };
 
@@ -121,8 +121,10 @@ impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
             debug!("Bridge handling incoming message");
             let new_state = handler(incoming_msg, prev_state);
             self.state = AsyncRequestBridgeState::Complete(new_state);
+            return true;
         } else {
             debug!("Unexpected: previous state was not awaiting?");
+            return false;
         }
     }
 }

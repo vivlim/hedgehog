@@ -7,6 +7,7 @@ fn main() -> eframe::Result<()> {
     use instant::Duration;
 
     use hedgehog::{
+        app::AsyncAppState,
         channels::{new_channel_pair, AsyncRequestBridge, Spawner},
         service::{new_async_service_channels, start_async_service, AsyncServiceMessage},
     };
@@ -16,7 +17,7 @@ fn main() -> eframe::Result<()> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let svc_async_tx = start_async_service();
-    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx);
+    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, AsyncAppState>::new(svc_async_tx);
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

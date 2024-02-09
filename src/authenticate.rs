@@ -28,7 +28,7 @@ pub async fn start_auth_service(mut rx: mpsc::Receiver<Message<AuthMessage>>) {
                             Err(e) => warn!("Failed to send echo reply for {}, {:?}", n, e),
                         }
                     }
-                    AuthMessage::MastodonRegister(url) => {}
+                    AuthMessage::Initialize => {}
                     _ => {}
                 },
                 Message::Notification { msg } => warn!("Unhandled mssage type"),
@@ -44,7 +44,7 @@ pub async fn start_auth_service(mut rx: mpsc::Receiver<Message<AuthMessage>>) {
 #[derive(Debug)]
 pub enum AuthMessage {
     Echo(u32),
-    MastodonRegister(String),
+    Initialize,
     MastodonData(String),
 }
 

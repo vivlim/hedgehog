@@ -63,7 +63,11 @@ pub async fn start_async_service_impl(
                         spawner.spawn_async(async {
                             start_auth_service(auth_rx).await;
                         });
-                        let auth_bridge = AsyncRequestBridge::<AuthMessage, u32>::new(auth_tx);
+                        //let auth_bridge = AsyncRequestBridge::<AuthMessage, u32>::new(auth_tx);
+                        match reply.send(AsyncServiceMessage::AuthChannel(auth_tx)) {
+                            Ok(_) => debug!("replied"),
+                            Err(e) => warn!("Failed to send auth service tx"),
+                        }
                     }
                     _ => todo!("unhandled service message"),
                 },
@@ -80,7 +84,7 @@ pub async fn start_async_service_impl(
 pub enum AsyncServiceMessage {
     Echo(u32),
     StartAuth(String),
-    AuthBridge(sync::mpsc::Sender<Message<AsyncServiceMessage>>),
+    AuthChannel(sync::mpsc::Sender<Message<AuthMessage>>),
 }
 
 #[derive(Default)]
