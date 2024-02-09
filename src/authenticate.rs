@@ -23,11 +23,17 @@ pub async fn start_auth_service(mut rx: mpsc::Receiver<Message<AuthMessage>>) {
                 Message::Request { msg, reply } => match msg {
                     AuthMessage::Initialize(instance) => {
                         debug!("Initializing masto client");
-                        let registration = Registration::new(instance)
+                        let client = reqwest::Client::builder()
+                            .user_agent("hedgehog.rs/0.0.0 https://github.com/vivlim/hedgehog")
+                            .build()
+                            .unwrap();
+                        let registration = Registration::new_with_client(instance, client)
                             .client_name("hedgehog")
+                            .redirect_uris("urn:ietf:wg:oauth:2.0:oob")
                             .build()
                             .await
                             .unwrap();
+                        debug!("registration created");
                         let url = registration.authorize_url().unwrap();
                         debug!("authorize url: {}", &url);
                         reply.send(AuthMessage::AuthorizeUrl(url)).unwrap();

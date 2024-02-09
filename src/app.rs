@@ -32,8 +32,9 @@ pub struct AsyncAppState {
     counter: u32,
 }
 
-pub struct AuthUiState {
-    signed_in: bool,
+pub enum AuthUiState {
+    WaitingForAuthCode { auth_url: String, auth_code: String },
+    SignedIn,
 }
 
 impl Default for TemplateApp {
@@ -84,7 +85,15 @@ impl eframe::App for TemplateApp {
             if br.pump_messages() {
                 ctx.request_repaint();
             }
-            // TODO: if a message was received, we should refresh the ui!
+            if let AsyncRequestBridgeState::Complete(AsyncAppState {
+                auth_bridge: Some(auth_bridge),
+                ..
+            }) = &mut br.state
+            {
+                if auth_bridge.pump_messages() {
+                    ctx.request_repaint()
+                }
+            }
         }
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -158,7 +167,7 @@ impl eframe::App for TemplateApp {
                     }) = &mut async_bridge.state
                     {
                         // It exists, so there is a mastodon instance
-                        match &auth_ui_bridge.state {
+                        match &mut auth_ui_bridge.state {
                             crate::channels::AsyncRequestBridgeState::Init => {
                                 // In init state, show a button that will continue the login when
                                 // clicked.
@@ -168,14 +177,17 @@ impl eframe::App for TemplateApp {
                                 {
                                     auth_ui_bridge.send(
                                         AuthMessage::Initialize(self.instance.clone()),
-                                        Box::new(|m, prev_state| match (m, prev_state) {
-                                            (AuthMessage::MastodonData(md), Some(p)) => {
-                                                AuthUiState { signed_in: true }
+                                        Box::new(|m, prev_state| {
+                                            debug!("ui received authorize url");
+                                            match (m, prev_state) {
+                                                (AuthMessage::AuthorizeUrl(url), _) => {
+                                                    AuthUiState::WaitingForAuthCode {
+                                                        auth_url: url,
+                                                        auth_code: "".to_string(),
+                                                    }
+                                                }
+                                                _ => panic!("can't handle this response."),
                                             }
-                                            (AuthMessage::MastodonData(md), None) => {
-                                                AuthUiState { signed_in: true }
-                                            }
-                                            _ => panic!("can't handle this response."),
                                         }),
                                     );
                                 }
@@ -190,11 +202,24 @@ impl eframe::App for TemplateApp {
                             crate::channels::AsyncRequestBridgeState::Updating => {
                                 ui.label("updating");
                             }
-                            crate::channels::AsyncRequestBridgeState::Complete(auth_state) => {
-                                ui.label(format!("complete. signed in: {}", auth_state.signed_in));
+                            crate::channels::AsyncRequestBridgeState::Complete(
+                                AuthUiState::WaitingForAuthCode {
+                                    auth_url,
+                                    ref mut auth_code,
+                                },
+                            ) => {
+                                ui.hyperlink_to("get auth code from here", auth_url);
+
+                                ui.label("and paste it here:");
+                                ui.text_edit_singleline(auth_code);
+                            }
+                            crate::channels::AsyncRequestBridgeState::Complete(
+                                AuthUiState::SignedIn,
+                            ) => {
+                                ui.label(format!("complete. signed in"));
                             }
                             crate::channels::AsyncRequestBridgeState::Error(e) => {
-                                ui.label(e);
+                                ui.label(format!("error: {}", e));
                             }
                         }
                     } else {
