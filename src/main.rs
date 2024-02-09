@@ -15,19 +15,8 @@ fn main() -> eframe::Result<()> {
 
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
-    let (ui_async_tx, ui_async_rx) = new_channel_pair::<AsyncServiceMessage>();
-    let (svc_async_tx, svc_async_rx) = new_channel_pair::<AsyncServiceMessage>();
-
-    let spawner = Spawner::new();
-    let spawner_clone = spawner.clone();
-    let spawner = spawner.spawn_root(async move {
-        debug!("start async service");
-        start_async_service(ui_async_tx, svc_async_rx, spawner_clone).await;
-        warn!("done async service.");
-    });
-
-    // ui_async_rx (notifications from svc to ui) is currently not hooked up.
-    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx, spawner);
+    let svc_async_tx = start_async_service();
+    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx);
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -61,19 +50,8 @@ fn main() {
 
     let web_options = eframe::WebOptions::default();
 
-    let (ui_async_tx, ui_async_rx) = new_channel_pair::<AsyncServiceMessage>();
-    let (svc_async_tx, svc_async_rx) = new_channel_pair::<AsyncServiceMessage>();
-
-    let spawner = Spawner::new();
-    let spawner_clone = spawner.clone();
-    let spawner = spawner.spawn_root(async move {
-        debug!("start async service");
-        start_async_service(ui_async_tx, svc_async_rx, spawner_clone).await;
-        warn!("done async service.");
-    });
-
-    // ui_async_rx (notifications from svc to ui) is currently not hooked up.
-    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx, spawner);
+    let svc_async_tx = start_async_service();
+    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx);
 
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()

@@ -22,7 +22,6 @@ pub enum Message<TMsg> {
 
 pub struct AsyncRequestBridge<TMsg, TState> {
     tx: sync::mpsc::Sender<Message<TMsg>>,
-    spawner: Spawner,
     pub state: AsyncRequestBridgeState<TMsg, TState>,
 }
 
@@ -39,13 +38,9 @@ pub enum AsyncRequestBridgeState<TMsg, TState> {
 }
 
 impl<TMsg, TState> AsyncRequestBridge<TMsg, TState> {
-    pub fn new(
-        tx: sync::mpsc::Sender<Message<TMsg>>,
-        spawner: Spawner,
-    ) -> AsyncRequestBridge<TMsg, TState> {
+    pub fn new(tx: sync::mpsc::Sender<Message<TMsg>>) -> AsyncRequestBridge<TMsg, TState> {
         AsyncRequestBridge {
             tx,
-            spawner,
             state: AsyncRequestBridgeState::Init,
         }
     }

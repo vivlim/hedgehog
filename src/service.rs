@@ -1,10 +1,15 @@
+use std::pin::Pin;
+
 use instant::Duration;
 
 use log::{debug, warn};
 use mastodon_async::{Mastodon, Registration};
-use tokio::sync::mpsc;
+use tokio::sync::{self, mpsc};
 
-use crate::channels::{new_channel_pair, Message, Spawner};
+use crate::{
+    authenticate::{start_auth_service, AuthMessage},
+    channels::{new_channel_pair, AsyncRequestBridge, Message, Spawner},
+};
 
 #[cfg(not(target_arch = "wasm"))]
 use tokio::time::*;
@@ -17,8 +22,23 @@ pub fn new_async_service_channels() -> (
 ) {
     mpsc::channel(255)
 }
-pub async fn start_async_service(
-    mut tx: mpsc::Sender<Message<AsyncServiceMessage>>,
+
+pub fn start_async_service() -> mpsc::Sender<Message<AsyncServiceMessage>> {
+    let spawner = Spawner::new();
+    let spawner_clone = spawner.clone();
+
+    let (ui_async_tx, svc_async_rx) = new_channel_pair::<AsyncServiceMessage>();
+
+    spawner.spawn_root(Box::pin(async move {
+        debug!("start async service");
+        start_async_service_impl(svc_async_rx, spawner_clone).await;
+        warn!("done async service.");
+    }));
+
+    ui_async_tx
+}
+
+pub async fn start_async_service_impl(
     mut rx: mpsc::Receiver<Message<AsyncServiceMessage>>,
     spawner: Spawner,
 ) {
@@ -35,12 +55,17 @@ pub async fn start_async_service(
                         //essential so comment it out
                         match reply.send(AsyncServiceMessage::Echo(n + 1)) {
                             Ok(_) => debug!("replied"),
-                            Err(e) => warn!("Failed to send echo reply for {}, {:?}", n, e),
+                            Err(e) => warn!("Failed to send echo reply for {}", n),
                         }
                     }
                     AsyncServiceMessage::StartAuth(url) => {
-                        spawner.spawn_async(async {});
+                        let (auth_tx, auth_rx) = new_channel_pair::<AuthMessage>();
+                        spawner.spawn_async(async {
+                            start_auth_service(auth_rx).await;
+                        });
+                        let auth_bridge = AsyncRequestBridge::<AuthMessage, u32>::new(auth_tx);
                     }
+                    _ => todo!("unhandled service message"),
                 },
                 Message::Notification { msg } => warn!("Unhandled mssage type"),
             },
@@ -52,10 +77,10 @@ pub async fn start_async_service(
     }
 }
 
-#[derive(Debug)]
 pub enum AsyncServiceMessage {
     Echo(u32),
     StartAuth(String),
+    AuthBridge(sync::mpsc::Sender<Message<AsyncServiceMessage>>),
 }
 
 #[derive(Default)]
