@@ -41,6 +41,7 @@ fn main() -> eframe::Result<()> {
 #[cfg(target_arch = "wasm32")]
 fn main() {
     use hedgehog::{
+        app::AsyncAppState,
         channels::{new_channel_pair, AsyncRequestBridge, Spawner},
         service::{new_async_service_channels, start_async_service, AsyncServiceMessage},
     };
@@ -52,7 +53,7 @@ fn main() {
     let web_options = eframe::WebOptions::default();
 
     let svc_async_tx = start_async_service();
-    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, u32>::new(svc_async_tx);
+    let ui_bridge = AsyncRequestBridge::<AsyncServiceMessage, AsyncAppState>::new(svc_async_tx);
 
     wasm_bindgen_futures::spawn_local(async {
         eframe::WebRunner::new()

@@ -11,9 +11,9 @@ use crate::{
     channels::{new_channel_pair, AsyncRequestBridge, Message, Spawner},
 };
 
-#[cfg(not(target_arch = "wasm"))]
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::time::*;
-#[cfg(target_arch = "wasm")]
+#[cfg(target_arch = "wasm32")]
 use wasmtimer::tokio::*;
 
 pub fn new_async_service_channels() -> (
@@ -51,8 +51,7 @@ pub async fn start_async_service_impl(
                 Message::Request { msg, reply } => match msg {
                     AsyncServiceMessage::Echo(n) => {
                         debug!("receive message. waiting 2 secs");
-                        //sleep(Duration::from_secs(2)).await; // This panics on wasm, not
-                        //essential so comment it out
+                        sleep(Duration::from_secs(2)).await;
                         match reply.send(AsyncServiceMessage::Echo(n + 1)) {
                             Ok(_) => debug!("replied"),
                             Err(e) => warn!("Failed to send echo reply for {}", n),

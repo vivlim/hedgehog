@@ -185,8 +185,7 @@ impl Spawner {
 
     pub fn spawn_root<F>(self, f: F) -> Self
     where
-        F: std::future::Future + std::marker::Send + 'static,
-        <F as std::future::Future>::Output: Send,
+        F: std::future::Future + 'static,
     {
         self.spawn_async(f);
         self
@@ -194,8 +193,7 @@ impl Spawner {
 
     pub fn spawn_async<F>(&self, f: F)
     where
-        F: std::future::Future + std::marker::Send + 'static,
-        <F as std::future::Future>::Output: Send,
+        F: std::future::Future + 'static,
     {
         wasm_bindgen_futures::spawn_local(async {
             f.await;
